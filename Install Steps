@@ -1,11 +1,11 @@
 # Debian installation (debootstrap)
- [Boot in to Live DVD]
+ [Boot up with Live CD]
  
 [ Terminal ]
 
 [ROOT ]
-
 	# sudo su -
+	
 [APT UPDATE]
 
 	# apt update
