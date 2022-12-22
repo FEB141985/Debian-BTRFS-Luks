@@ -1,0 +1,170 @@
+# Debian installation (debootstrap)
+ [Boot in to Live DVD]
+ 
+[ Terminal ]
+
+[ROOT ]
+
+	# sudo su -
+[APT UPDATE]
+
+	# apt update
+	
+(Preparing partitions)
+
+	# lsblk
+
+	# gdisk /dev/sda
+
+	1) SIZE: 550MB CODE: EF00
+	2) REST: FILE SYSTEM: BTRFS
+	
+[ENCRYPTION]
+
+ # cryptsetup -c aes-xts-plain64 -s 512 -h sha512 luksFormat --type luks1 /dev/PARTITION
+ 
+ # cryptsetup open /dev/sda2 "GIVEN DRIVE NAME(GDN)"
+ 
+[FORMAT PARTITION]
+
+ # mkfs.vfat -F32 -n EFI /dev/sda1
+ # mkfs.btrfs -L DEBIAN /dev/mapper/GDN
+
+[MOUNT]
+
+	# mount /dev/mapper/GDN /mnt
+
+[CREATE SUBVOL]
+
+	# btrfs su cr /mnt/@
+	# btrfs su cr /mnt/@home
+	# btrfs su cr /mnt/@snapshots
+    
+
+[UMOUNT]
+	# umount /mnt
+
+[MOUNT SUBVOL && BOOT/EFI]
+
+	# mount -o noatime,nodiratime,compress=zstd,discard=async,space_cache=v2,ssd,subvol=@ /dev/mapper/GDN /mnt
+	# mkdir -p /mnt/{boot/efi,home,.snapshots}
+	# mount -o noatime,nodiratime,compress=zstd,space_cache=v2,ssd,subvol=@home /dev/mapper/GDN /mnt/home
+	# mount -o noatime,nodiratime,compress=zstd,space_cache=v2,ssd,subvol=@snapshots /dev/mapper/GDN /mnt/.snapshots
+	# mount /dev/sda1 /mnt/boot
+
+
+[INSTALL BOOTSTRAP]
+    # apt install debootstrap
+	
+[RUN BOOTSTRAP]
+    # debootstrap --include linux-image-amd64,grub-efi,locales --arch amd64 bullseye /mnt
+
+[SOURCE LIST]
+    # cp /etc/apt/sources.list /mnt/etc/apt
+	
+******************************************************************************
+[FS TABLE]  
+	# cp /etc/mtab /mnt/etc/mtab
+	
+[MOUNT PSEUDO-FS && NETWORKING]
+   
+	# for dir in sys dev proc; do mount --rbind /$dir /mnt/$dir && mount --make-rslave /mnt/$dir ; done
+	# cp /etc/resolv.conf /mnt/etc/
+******************************************************************************************************************
+[GENERATE FSTAB]   
+
+	# apt install arch-install-scripts
+
+[GENERATE FSTAB]
+
+    # genfstab -U /mnt >> /mnt/etc/fstab
+	
+[CHROOT]
+
+	# chroot /mnt /bin/bash
+	
+[SOURCE LIST]
+    # cp /etc/apt/sources.list /mnt/etc/apt
+    # vi /mnt/etc/apt/sources.list
+	
+	(Update sources.list)
+
+  deb http://deb.debian.org/debian bullseye main contrib non-free
+	deb-src http://deb.debian.org/debian bullseye main contrib non-free
+
+	deb http://deb.debian.org/debian-security/ bullseye-security main contrib non-free
+	deb-src http://deb.debian.org/debian-security/ bullseye-security main contrib non-free
+
+	deb http://deb.debian.org/debian bullseye-updates main contrib non-free
+	deb-src http://deb.debian.org/debian bullseye-updates main contrib non-free
+	
+[BACKOPRTS SOURCE]
+
+	deb http://deb.debian.org/debian bullseye-backports main contrib non-free
+	deb-src http://deb.debian.org/debian bullseye-backports main contrib non-free
+	
+[SID]
+
+	deb http://mirror.us.leaseweb.net/debian/ sid main   
+	deb-src http://mirror.us.leaseweb.net/debian/ sid main  
+  
+[UPDATE] 
+	# apt update
+  
+[INSTALL BASE WITH PKGS]
+  
+	# apt install btrfs-progs locales (linux-image-amd64) sudo ntp network-manager vim intel-microcode/amd64-microcode
+
+[UPDATE ZONE INFO]
+
+    # dpkg-reconfigure tzdata
+
+[LOCALE]
+
+  # dpkg-reconfigure locales
+  Choose "en_US.UTF-8"
+
+[SET HOSTNAME]
+
+	# vi /etc/hostname
+	# vi /etc/hosts
+	
+[NETWORK PKGS]
+
+	 # apt install dhcpcd5 wireless-tools wpasupplicant dialog firmware-iwlwifi
+	 
+[USER PROFILES]
+    
+	# useradd $USER -m -c "DESCRIPTION" -s /bin/bash
+  # passwd $USER
+	# usermod -aG sudo $USER
+	
+	 
+[GRUB && TOOLS]
+	
+	# apt install grub-efi-amd64 efibootmgr os-prober cryptsetup ntfs-3g mtools dosfstools
+	 
+[CRYPTTAB ENTRY] 
+	
+	EDIT: /etc/crypttab
+    ( GDN <tab> UUID=[uuid-of-encrypted-partition] <tab> none <tab> luks )
+	
+[GRUB]
+
+  # vi /etc/default/grub
+
+	GRUB_CMDLINE_LINUX="cryptdevice=UUID=[uuid-of-encrypted-partition]:GDN root=/dev/mapper/GDN"
+	GRUB_ENABLE_CRYPTODISK=y (ENCRYPTIED BOOT)
+	
+[INSTALL GRUB && UPDATE INITRAMFS]	
+	
+	# grub-install /dev/sda
+	# update-grub
+	# update-initramfs -u -k all
+	
+[ENABLE NETWORKMGR]	
+
+	# systemctl enable dhcpcd
+	# systemctl enable NetworkManager
+  
+ !!!Reboot!!!
